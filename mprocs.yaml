@@ -1,0 +1,5 @@
+procs:
+  dev:
+    shell: "pnpm run start:dev"
+  ngrok:
+    shell: "ngrok http 3000"

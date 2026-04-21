@@ -50,7 +50,7 @@ function getLog(code) {
 async function api(method, path, body, headers = {}) {
   const res = await fetch(path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1', ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
@@ -222,8 +222,11 @@ function render() {
     bindLanding();
     return;
   }
+  const savedTopic = document.getElementById('topic-input')?.value ?? '';
   app.innerHTML = renderRoom();
   bindRoom();
+  const topicInput = document.getElementById('topic-input');
+  if (topicInput && savedTopic) topicInput.value = savedTopic;
 }
 
 function renderLanding() {
@@ -446,7 +449,7 @@ function renderCard({ voted, isMe, value, flipped, delay, noVote }) {
     <div class="playing-card ${flipped ? 'is-flipped' : ''}" ${delayStyle}>
       <div class="card-inner">
         <div class="card-back">
-          ${voted && !flipped ? '<span style="font-size:1.1rem;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.8)">✓</span>' : ''}
+          ${voted && !flipped ? '<span style="display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:9999px;background:#fff;color:#16a34a;font-size:1rem;font-weight:700;line-height:1">✓</span>' : ''}
         </div>
         <div class="card-front ${noVote ? 'no-vote' : ''} ${isMe && flipped ? 'is-mine' : ''}">
           ${flipped ? (noVote ? '—' : value) : ''}
