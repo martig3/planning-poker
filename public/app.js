@@ -445,7 +445,7 @@ function renderCard({ voted, isMe, value, flipped, delay, noVote }) {
     <div class="playing-card ${flipped ? 'is-flipped' : ''}" ${delayStyle}>
       <div class="card-inner">
         <div class="card-back">
-          ${voted && !flipped ? '<span style="font-size:1.1rem">✓</span>' : ''}
+          ${voted && !flipped ? '<span style="font-size:1.1rem;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.8)">✓</span>' : ''}
         </div>
         <div class="card-front ${noVote ? 'no-vote' : ''} ${isMe && flipped ? 'is-mine' : ''}">
           ${flipped ? (noVote ? '—' : value) : ''}
