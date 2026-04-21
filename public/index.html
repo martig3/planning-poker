@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Planning Poker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .playing-card {
+        width: 4rem;
+        height: 6rem;
+        perspective: 700px;
+        flex-shrink: 0;
+      }
+      .card-inner {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        transform-style: preserve-3d;
+      }
+      .playing-card.is-flipped .card-inner {
+        animation: card-flip 0.45s cubic-bezier(0.4, 0, 0.2, 1) var(--flip-delay, 0s) forwards;
+      }
+      @keyframes card-flip {
+        from { transform: rotateY(0deg); }
+        to   { transform: rotateY(180deg); }
+      }
+      .card-back,
+      .card-front {
+        position: absolute;
+        inset: 0;
+        border-radius: 0.625rem;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+      }
+      .card-back {
+        background: linear-gradient(150deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+      }
+      .card-back::before {
+        content: '';
+        position: absolute;
+        inset: 5px;
+        border: 1.5px solid rgba(255,255,255,0.25);
+        border-radius: 6px;
+      }
+      .card-front {
+        transform: rotateY(180deg);
+        background: white;
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        font-size: 1.35rem;
+        color: #1e293b;
+      }
+      .card-front.no-vote {
+        color: #cbd5e1;
+      }
+      .card-front.is-mine {
+        border-color: #93c5fd;
+        box-shadow: 0 0 0 3px #bfdbfe, 0 2px 8px rgba(0,0,0,0.1);
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-slate-100 text-slate-800 font-sans">
+    <div id="app" class="max-w-2xl mx-auto p-4 pb-16"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
