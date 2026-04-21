@@ -35,7 +35,6 @@ export interface HistoryEntry {
 
 export interface Room {
   code: string;
-  adminToken: string;
   adminUserId: string;
   createdAt: number;
   users: Map<string, User>;

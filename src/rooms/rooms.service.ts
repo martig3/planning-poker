@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { randomUUID, randomBytes } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { Observable } from 'rxjs';
 import {
   FIBONACCI,
@@ -29,20 +29,13 @@ export class RoomsService {
   // stale SSE connection doesn't evict a user who has already reconnected.
   private readonly connectionIds = new Map<string, string>();
 
-  createRoom(dto: CreateRoomDto): {
-    code: string;
-    adminToken: string;
-    userId: string;
-    userName: string;
-  } {
+  createRoom(dto: CreateRoomDto): { code: string; userId: string; userName: string } {
     const name = this.sanitizeName(dto.adminName);
     const code = this.generateCode();
     const userId = randomUUID();
-    const adminToken = randomBytes(16).toString('hex');
 
     const room: Room = {
       code,
-      adminToken,
       adminUserId: userId,
       createdAt: Date.now(),
       users: new Map([[userId, { id: userId, name, joinedAt: Date.now() }]]),
@@ -51,7 +44,7 @@ export class RoomsService {
     };
 
     this.rooms.set(code, room);
-    return { code, adminToken, userId, userName: name };
+    return { code, userId, userName: name };
   }
 
   joinRoom(
@@ -91,24 +84,36 @@ export class RoomsService {
       userName: user.name,
     });
 
+    if (room.users.size === 0) {
+      if (room.currentTopic?.revealTimer) clearTimeout(room.currentTopic.revealTimer);
+      this.rooms.delete(code);
+      return;
+    }
+
+    // Transfer admin to the longest-standing remaining user
+    if (room.adminUserId === userId) {
+      const next = [...room.users.values()].sort((a, b) => a.joinedAt - b.joinedAt)[0];
+      room.adminUserId = next.id;
+      this.events.emit(RoomEvents.AdminChanged, {
+        type: 'admin-changed',
+        roomCode: code,
+        at: Date.now(),
+        adminUserId: next.id,
+      });
+    }
+
     if (
       room.currentTopic &&
       room.currentTopic.state === 'active' &&
-      room.users.size > 0 &&
       room.currentTopic.votes.size >= room.users.size
     ) {
       clearTimeout(room.currentTopic.revealTimer);
       this.reveal(room, 'all-voted');
     }
-
-    if (room.users.size === 0) {
-      if (room.currentTopic?.revealTimer) clearTimeout(room.currentTopic.revealTimer);
-      this.rooms.delete(code);
-    }
   }
 
-  createTopic(code: string, adminToken: string, title: string): { topicId: string; title: string } {
-    const room = this.mustGetRoomAsAdmin(code, adminToken);
+  createTopic(code: string, userId: string, title: string): { topicId: string; title: string } {
+    const room = this.mustGetRoomAsAdmin(code, userId);
 
     if (room.currentTopic && room.currentTopic.state === 'active') {
       throw new ConflictException('Current topic is not yet revealed');
@@ -299,9 +304,9 @@ export class RoomsService {
     return room;
   }
 
-  private mustGetRoomAsAdmin(code: string, adminToken: string): Room {
+  private mustGetRoomAsAdmin(code: string, userId: string): Room {
     const room = this.mustGetRoom(code);
-    if (room.adminToken !== adminToken) throw new UnauthorizedException('Invalid admin token');
+    if (room.adminUserId !== userId) throw new UnauthorizedException('Not the admin of this room');
     return room;
   }
 

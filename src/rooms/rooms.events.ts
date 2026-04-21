@@ -6,6 +6,7 @@ export const RoomEvents = {
   TopicCreated: 'room.topic-created',
   VoteCast: 'room.vote-cast',
   Revealed: 'room.revealed',
+  AdminChanged: 'room.admin-changed',
 } as const;
 
 interface BaseEvt {
@@ -49,10 +50,16 @@ export interface RevealedEvt extends BaseEvt {
   reason: 'timeout' | 'all-voted';
 }
 
+export interface AdminChangedEvt extends BaseEvt {
+  type: 'admin-changed';
+  adminUserId: string;
+}
+
 export type RoomEvent =
   | HelloEvt
   | UserJoinedEvt
   | UserLeftEvt
   | TopicCreatedEvt
   | VoteCastEvt
-  | RevealedEvt;
+  | RevealedEvt
+  | AdminChangedEvt;

@@ -1,7 +1,7 @@
 // ─── state ───────────────────────────────────────────────────────────────────
 
 const state = {
-  session: null,     // { code, userId, userName, adminToken? }
+  session: null,     // { code, userId, userName }
   snapshot: null,    // RoomSnapshot from server
   es: null,          // EventSource
   countdown: null,   // setInterval id while topic is active
@@ -64,7 +64,7 @@ async function api(method, path, body, headers = {}) {
 
 async function createRoom(adminName) {
   const data = await api('POST', '/rooms', { adminName });
-  saveSession({ code: data.code, userId: data.userId, userName: data.userName, adminToken: data.adminToken });
+  saveSession({ code: data.code, userId: data.userId, userName: data.userName });
   localStorage.setItem('poker:last-room', JSON.stringify({ code: data.code, userName: data.userName }));
   state.snapshot = await api('GET', `/rooms/${data.code}`);
   enterRoom(data.code);
@@ -79,8 +79,8 @@ async function joinRoom(code, name) {
 }
 
 async function submitTopic(title) {
-  const { code, adminToken } = state.session;
-  await api('POST', `/rooms/${code}/topics`, { title }, { 'x-admin-token': adminToken });
+  const { code, userId } = state.session;
+  await api('POST', `/rooms/${code}/topics`, { title }, { 'x-user-id': userId });
 }
 
 async function castVote(value) {
@@ -93,7 +93,7 @@ async function castVote(value) {
 // ─── SSE ──────────────────────────────────────────────────────────────────────
 
 function enterRoom(code) {
-  history.replaceState(null, '', '#' + code);
+  history.replaceState(null, '', '?room=' + code);
   state.es?.close();
   state.myVote = null;
   state.es = new EventSource(`/rooms/${code}/events?userId=${state.session.userId}`);
@@ -162,6 +162,12 @@ function enterRoom(code) {
       reason: evt.reason,
       votes: evt.votes.map((v) => ({ userName: v.userName, value: v.value })),
     });
+    render();
+  });
+
+  state.es.addEventListener('admin-changed', (e) => {
+    const { adminUserId } = JSON.parse(e.data);
+    if (state.snapshot) state.snapshot.adminUserId = adminUserId;
     render();
   });
 
@@ -667,21 +673,21 @@ function showErr(el, msg) {
 // ─── boot ─────────────────────────────────────────────────────────────────────
 
 // Boot: read room code from URL hash and resume or pre-fill join
-const hashCode = location.hash.replace('#', '').trim();
-if (hashCode && hashCode.length === 4) {
-  const saved = loadSession(hashCode);
+const roomCode = new URLSearchParams(location.search).get('room');
+if (roomCode && roomCode.length === 4) {
+  const saved = loadSession(roomCode);
   if (saved) {
     state.session = saved;
-    api('GET', `/rooms/${hashCode}`)
-      .then((snap) => { state.snapshot = snap; enterRoom(hashCode); })
+    api('GET', `/rooms/${roomCode}`)
+      .then((snap) => { state.snapshot = snap; enterRoom(roomCode); })
       .catch(() => {
-        clearSession(hashCode);
+        clearSession(roomCode);
         history.replaceState(null, '', location.pathname);
         render();
       });
   } else {
     // No saved session — show focused invite join prompt
-    state.inviteCode = hashCode;
+    state.inviteCode = roomCode;
     render();
   }
 } else {

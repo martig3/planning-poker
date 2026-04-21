@@ -39,10 +39,10 @@ export class RoomsController {
   @Post(':code/topics')
   createTopic(
     @Param('code') code: string,
-    @Headers('x-admin-token') adminToken: string,
+    @Headers('x-user-id') userId: string,
     @Body() dto: CreateTopicDto,
   ) {
-    return this.rooms.createTopic(code, adminToken, dto.title);
+    return this.rooms.createTopic(code, userId, dto.title);
   }
 
   @Post(':code/votes')
