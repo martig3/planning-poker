@@ -197,7 +197,7 @@ function startCountdown() {
     const t = state.snapshot?.currentTopic;
     if (!t || t.state !== 'active') { stopCountdown(); return; }
     const elapsed = (Date.now() - t.createdAt) / 1000;
-    const remaining = Math.max(0, 10 - elapsed);
+    const remaining = Math.max(0, REVEAL_TIMEOUT_S - elapsed);
     el.textContent = remaining > 0 ? `${Math.ceil(remaining)}s` : '—';
     el.className = remaining <= 3
       ? 'text-red-500 font-bold text-lg'
@@ -212,7 +212,8 @@ function stopCountdown() {
 
 // ─── render ───────────────────────────────────────────────────────────────────
 
-const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, '?'];
+const FIBONACCI = [0, 1, 2, 3, 5, 8, 13];
+const REVEAL_TIMEOUT_S = 15;
 
 function render() {
   const app = document.getElementById('app');
@@ -540,13 +541,11 @@ function renderHistory(log) {
     <details class="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
       <summary class="cursor-pointer text-sm font-medium text-slate-600 select-none flex items-center justify-between">
         <span>History (${log.length} topic${log.length !== 1 ? 's' : ''})</span>
-      </summary>
-      <div class="mt-3 flex justify-end">
-        <button id="export-btn"
-          class="text-xs text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-400 rounded-lg px-3 py-1.5 transition-colors">
-          Export as Markdown
+        <button id="copy-md-btn" onclick="event.preventDefault()"
+          class="text-xs text-slate-400 hover:text-blue-600 border border-slate-200 hover:border-blue-400 rounded-lg px-3 py-1 transition-colors">
+          Copy as Markdown
         </button>
-      </div>
+      </summary>
       <ol class="mt-3 space-y-3">
         ${[...log].reverse().map((entry, i) => `
           <li class="border-t border-slate-100 pt-3 ${i === 0 ? 'border-t-0 pt-0' : ''}">
@@ -597,18 +596,13 @@ function buildMarkdown(log, code) {
 }
 
 function bindRoom() {
-  document.getElementById('export-btn')?.addEventListener('click', () => {
+  document.getElementById('copy-md-btn')?.addEventListener('click', async () => {
     const { code } = state.session;
     const log = getLog(code);
     if (!log.length) return;
-    const md = buildMarkdown(log, code);
-    const blob = new Blob([md], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `planning-poker-${code}-${new Date().toISOString().slice(0, 10)}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await navigator.clipboard.writeText(buildMarkdown(log, code));
+    const btn = document.getElementById('copy-md-btn');
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy as Markdown'; }, 2000); }
   });
 
   document.getElementById('copy-btn')?.addEventListener('click', async () => {

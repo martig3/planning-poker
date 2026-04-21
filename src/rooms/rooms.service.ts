@@ -19,6 +19,9 @@ import {
 import { RoomEvents, type RoomEvent } from './rooms.events.js';
 import type { CreateRoomDto } from './dto/create-room.dto.js';
 
+const REVEAL_TIMEOUT_S = 15;
+const REVEAL_TIMEOUT_MS = REVEAL_TIMEOUT_S * 1000;
+
 @Injectable()
 export class RoomsService {
   constructor(private readonly events: EventEmitter2) {}
@@ -130,7 +133,7 @@ export class RoomsService {
       votes: new Map(),
     };
 
-    topic.revealTimer = setTimeout(() => this.reveal(room, 'timeout'), 10_000);
+    topic.revealTimer = setTimeout(() => this.reveal(room, 'timeout'), REVEAL_TIMEOUT_MS);
     room.currentTopic = topic;
 
     this.events.emit(RoomEvents.TopicCreated, {
