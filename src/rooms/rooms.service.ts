@@ -39,6 +39,7 @@ export class RoomsService {
 
     const room: Room = {
       code,
+      creatorId: userId,
       adminUserId: userId,
       createdAt: Date.now(),
       users: new Map([[userId, { id: userId, name, joinedAt: Date.now() }]]),
@@ -68,6 +69,50 @@ export class RoomsService {
     });
 
     return { userId, userName: sanitized, snapshot: this.buildSnapshot(room) };
+  }
+
+  rejoinRoom(
+    code: string,
+    userId: string | undefined,
+    name: string,
+  ): { userId: string; userName: string; snapshot: RoomSnapshot } {
+    const room = this.mustGetRoom(code);
+    const sanitized = this.sanitizeName(name);
+
+    // Already a member — keep the same identity, refresh display name.
+    if (userId && room.users.has(userId)) {
+      const user = room.users.get(userId)!;
+      user.name = sanitized;
+      return { userId, userName: sanitized, snapshot: this.buildSnapshot(room) };
+    }
+
+    // Original creator returning after eviction — restore their user and admin.
+    if (userId && userId === room.creatorId) {
+      room.users.set(userId, { id: userId, name: sanitized, joinedAt: Date.now() });
+      const wasAdmin = room.adminUserId === userId;
+      room.adminUserId = userId;
+
+      this.events.emit(RoomEvents.UserJoined, {
+        type: 'user-joined',
+        roomCode: code,
+        at: Date.now(),
+        user: { id: userId, name: sanitized },
+      });
+
+      if (!wasAdmin) {
+        this.events.emit(RoomEvents.AdminChanged, {
+          type: 'admin-changed',
+          roomCode: code,
+          at: Date.now(),
+          adminUserId: userId,
+        });
+      }
+
+      return { userId, userName: sanitized, snapshot: this.buildSnapshot(room) };
+    }
+
+    // Stale or unknown userId — fall back to a fresh join.
+    return this.joinRoom(code, sanitized);
   }
 
   leaveRoom(code: string, userId: string): void {

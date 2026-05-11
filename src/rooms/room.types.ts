@@ -35,6 +35,8 @@ export interface HistoryEntry {
 
 export interface Room {
   code: string;
+  // The original creator. Never changes — used to restore admin when they rejoin.
+  creatorId: string;
   adminUserId: string;
   createdAt: number;
   users: Map<string, User>;

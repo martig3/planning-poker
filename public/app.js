@@ -11,18 +11,20 @@ const state = {
 
 // ─── session persistence ─────────────────────────────────────────────────────
 
+// Persisted in localStorage so the userId survives a tab close — when the
+// admin reopens the room URL, the server can recognize them and restore admin.
 function saveSession(s) {
-  sessionStorage.setItem('poker:session:' + s.code, JSON.stringify(s));
+  localStorage.setItem('poker:session:' + s.code, JSON.stringify(s));
   state.session = s;
 }
 
 function loadSession(code) {
-  const raw = sessionStorage.getItem('poker:session:' + code);
+  const raw = localStorage.getItem('poker:session:' + code);
   return raw ? JSON.parse(raw) : null;
 }
 
 function clearSession(code) {
-  sessionStorage.removeItem('poker:session:' + code);
+  localStorage.removeItem('poker:session:' + code);
   state.session = null;
   state.snapshot = null;
   state.myVote = null;
@@ -62,10 +64,16 @@ async function api(method, path, body, headers = {}) {
 
 // ─── room actions ─────────────────────────────────────────────────────────────
 
+// userId is kept in poker:last-room so an explicit Leave (which clears the
+// per-room session) still lets the rejoin card hit /rejoin and reclaim admin.
+function rememberLastRoom(code, userId, userName) {
+  localStorage.setItem('poker:last-room', JSON.stringify({ code, userId, userName }));
+}
+
 async function createRoom(adminName) {
   const data = await api('POST', '/rooms', { adminName });
   saveSession({ code: data.code, userId: data.userId, userName: data.userName });
-  localStorage.setItem('poker:last-room', JSON.stringify({ code: data.code, userName: data.userName }));
+  rememberLastRoom(data.code, data.userId, data.userName);
   state.snapshot = await api('GET', `/rooms/${data.code}`);
   enterRoom(data.code);
 }
@@ -73,7 +81,15 @@ async function createRoom(adminName) {
 async function joinRoom(code, name) {
   const data = await api('POST', `/rooms/${code}/join`, { name });
   saveSession({ code, userId: data.userId, userName: data.userName });
-  localStorage.setItem('poker:last-room', JSON.stringify({ code, userName: data.userName }));
+  rememberLastRoom(code, data.userId, data.userName);
+  state.snapshot = data.snapshot;
+  enterRoom(code);
+}
+
+async function rejoinRoom(code, userId, name) {
+  const data = await api('POST', `/rooms/${code}/rejoin`, { userId, name });
+  saveSession({ code, userId: data.userId, userName: data.userName });
+  rememberLastRoom(code, data.userId, data.userName);
   state.snapshot = data.snapshot;
   enterRoom(code);
 }
@@ -163,6 +179,7 @@ function enterRoom(code) {
       votes: evt.votes.map((v) => ({ userName: v.userName, value: v.value })),
     });
     render();
+    celebrateIfConsensus(evt.votes);
   });
 
   state.es.addEventListener('admin-changed', (e) => {
@@ -185,6 +202,34 @@ function enterRoom(code) {
   };
 
   render();
+}
+
+// ─── confetti ─────────────────────────────────────────────────────────────────
+
+// Fire after card-flip animation finishes: 0.45s flip + (n-1) * 0.07s stagger.
+function celebrateIfConsensus(votes) {
+  const submitted = (votes ?? []).filter((v) => typeof v.value === 'number');
+  if (submitted.length < 2) return;
+  const first = submitted[0].value;
+  if (!submitted.every((v) => v.value === first)) return;
+  if (typeof confetti !== 'function') return;
+
+  const delay = 450 + (submitted.length - 1) * 70 + 50;
+  setTimeout(() => {
+    const y = window.innerHeight;
+    const left = { x: 0, y };
+    const right = { x: window.innerWidth, y };
+    // Library has no angle param — anchoring at the bottom corners means
+    // downward/outward particles exit immediately, leaving the upward arc visible.
+    // `count` appears to saturate per call, so stack several staggered bursts
+    // for a denser, sustained shower.
+    for (let i = 0; i < 6; i++) {
+      setTimeout(() => {
+        confetti({ position: left, count: 200, velocity: 700, fade: true });
+        confetti({ position: right, count: 200, velocity: 700, fade: true });
+      }, i * 120);
+    }
+  }, delay);
 }
 
 // ─── countdown ────────────────────────────────────────────────────────────────
@@ -328,11 +373,15 @@ function bindLanding() {
   document.getElementById('rejoin-btn')?.addEventListener('click', async () => {
     const last = JSON.parse(localStorage.getItem('poker:last-room') ?? 'null');
     if (!last) return;
+    // last.userId may be missing for pointers written before this change;
+    // /rejoin handles undefined by falling back to a fresh join.
+    const savedId = last.userId ?? loadSession(last.code)?.userId;
     try {
-      await joinRoom(last.code, last.userName);
+      await rejoinRoom(last.code, savedId, last.userName);
     } catch (e) {
       // Room is gone (server restarted) — clear the stale entry and show an error
       localStorage.removeItem('poker:last-room');
+      clearSession(last.code);
       render();
       showErr(document.getElementById('join-err'), `Room ${last.code} no longer exists`);
     }
@@ -674,14 +723,13 @@ const roomCode = new URLSearchParams(location.search).get('room');
 if (roomCode && roomCode.length === 4) {
   const saved = loadSession(roomCode);
   if (saved) {
-    state.session = saved;
-    api('GET', `/rooms/${roomCode}`)
-      .then((snap) => { state.snapshot = snap; enterRoom(roomCode); })
-      .catch(() => {
-        clearSession(roomCode);
-        history.replaceState(null, '', location.pathname);
-        render();
-      });
+    // Reclaim our previous identity. If the saved userId belongs to the
+    // original creator, the server restores them as admin.
+    rejoinRoom(roomCode, saved.userId, saved.userName).catch(() => {
+      clearSession(roomCode);
+      history.replaceState(null, '', location.pathname);
+      render();
+    });
   } else {
     // No saved session — show focused invite join prompt
     state.inviteCode = roomCode;

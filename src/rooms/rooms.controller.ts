@@ -13,7 +13,7 @@ import { map } from 'rxjs/operators';
 import { interval, merge, Observable } from 'rxjs';
 import { RoomsService } from './rooms.service.js';
 import { CreateRoomDto } from './dto/create-room.dto.js';
-import { JoinRoomDto } from './dto/join-room.dto.js';
+import { JoinRoomDto, RejoinRoomDto } from './dto/join-room.dto.js';
 import { CreateTopicDto } from './dto/create-topic.dto.js';
 import { CastVoteDto } from './dto/cast-vote.dto.js';
 
@@ -34,6 +34,11 @@ export class RoomsController {
   @Post(':code/join')
   joinRoom(@Param('code') code: string, @Body() dto: JoinRoomDto) {
     return this.rooms.joinRoom(code, dto.name);
+  }
+
+  @Post(':code/rejoin')
+  rejoinRoom(@Param('code') code: string, @Body() dto: RejoinRoomDto) {
+    return this.rooms.rejoinRoom(code, dto.userId, dto.name);
   }
 
   @Post(':code/topics')
