@@ -52,7 +52,7 @@ function getLog(code) {
 async function api(method, path, body, headers = {}) {
   const res = await fetch(path, {
     method,
-    headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1', ...headers },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
